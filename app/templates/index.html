@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PhishLens — Hybrid URL & HTML Threat Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a111e;
+    --bg-grad: radial-gradient(1200px 600px at 80% -10%, #14233f 0%, rgba(20,35,63,0) 60%), radial-gradient(900px 500px at -10% 10%, #161a3a 0%, rgba(22,26,58,0) 55%), #0a111e;
+    --panel: #101c30;
+    --panel-2: #13233c;
+    --line: #223349;
+    --line-soft: #1a2940;
+    --ink: #e9eff8;
+    --ink-2: #93a4bd;
+    --muted: #66788f;
+    --safe: #34d399;
+    --safe-soft: rgba(52, 211, 153, 0.14);
+    --risk: #fb7185;
+    --risk-strong: #f43f5e;
+    --risk-soft: rgba(251, 113, 133, 0.14);
+    --warn: #fbbf24;
+    --warn-soft: rgba(251, 191, 36, 0.14);
+    --brand: #818cf8;
+    --brand-2: #a78bfa;
+    --brand-soft: rgba(129, 140, 248, 0.14);
+    --radius: 16px;
+    --shadow: 0 18px 50px -20px rgba(0,0,0,0.7);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--ink);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 20px 80px;
+  }
+
+  .wrap { max-width: 840px; margin: 0 auto; }
+
+  /* ---------- Header ---------- */
+  header { margin-bottom: 36px; }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .lens {
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 24px -8px rgba(129,140,248,0.6);
+    flex-shrink: 0;
+  }
+  .lens svg { width: 21px; height: 21px; display: block; }
+  .brand h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .brand h1 span { color: var(--brand); }
+  .tagline {
+    color: var(--ink-2);
+    font-size: 0.95rem;
+    max-width: 60ch;
+  }
+  .tagline code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--brand-2);
+    background: var(--brand-soft);
+    padding: 1px 6px;
+    border-radius: 5px;
+  }
+
+  /* ---------- Search ---------- */
+  .console {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .input-row { display: flex; gap: 10px; }
+  .field {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .field .prefix {
+    position: absolute;
+    left: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+  }
+  #urlInput {
+    width: 100%;
+    padding: 15px 16px 15px 40px;
+    border-radius: 11px;
+    border: 1px solid var(--line);
+    background: #0b1626;
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  #urlInput::placeholder { color: var(--muted); }
+  #urlInput:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+  }
+  #analyseBtn {
+    padding: 0 26px;
+    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%);
+    color: #0a111e;
+    border: none;
+    border-radius: 11px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.98rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.12s, filter 0.18s, opacity 0.18s;
+    white-space: nowrap;
+  }
+  #analyseBtn:hover { filter: brightness(1.08); }
+  #analyseBtn:active { transform: translateY(1px); }
+  #analyseBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    align-items: center;
+  }
+  .examples .lbl {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-right: 2px;
+  }
+  .chip {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .chip:hover { border-color: var(--brand); color: var(--ink); }
+  .chip .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .chip .dot.safe { background: var(--safe); }
+  .chip .dot.bad { background: var(--risk); }
+
+  /* ---------- States ---------- */
+  .loader {
+    display: none;
+    margin-top: 22px;
+    padding: 22px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: var(--panel);
+    color: var(--ink-2);
+    font-size: 0.92rem;
+    align-items: center;
+    gap: 14px;
+  }
+  .loader.active { display: flex; }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--line);
+    border-top-color: var(--brand);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .notice {
+    display: none;
+    margin-top: 18px;
+    padding: 13px 16px;
+    border-radius: 11px;
+    font-size: 0.88rem;
+  }
+  .notice.error { display: block; background: var(--risk-soft); border: 1px solid rgba(244,63,94,0.35); color: #fecdd3; }
+  .notice.demo  { display: block; background: var(--warn-soft); border: 1px solid rgba(251,191,36,0.32); color: #fde68a; }
+
+  /* ---------- Results ---------- */
+  #results { display: none; margin-top: 26px; }
+  #results.show { display: block; }
+  .reveal { animation: rise 0.45s cubic-bezier(0.2,0.7,0.2,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+  /* Verdict banner */
+  .verdict-banner {
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    position: relative;
+    overflow: hidden;
+  }
+  .verdict-banner::before {
+    content: "";
+    position: absolute; inset: 0;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .verdict-banner.safe::before { background: radial-gradient(600px 200px at 0% 0%, var(--safe-soft), transparent 70%); }
+  .verdict-banner.bad::before  { background: radial-gradient(600px 200px at 0% 0%, var(--risk-soft), transparent 70%); }
+  .verdict-banner.warn::before { background: radial-gradient(600px 200px at 0% 0%, var(--warn-soft), transparent 70%); }
+
+  .verdict-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+    flex-wrap: wrap;
+  }
+  .verdict-label {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: var(--ink-2);
+    margin-bottom: 6px;
+  }
+  .verdict-word {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .verdict-word.safe { color: var(--safe); }
+  .verdict-word.bad  { color: var(--risk); }
+  .verdict-word.warn { color: var(--warn); }
+  .scanned-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--ink-2);
+    margin-top: 6px;
+    word-break: break-all;
+  }
+  .agree {
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 6px 11px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .agree.yes { background: var(--brand-soft); color: var(--brand); }
+  .agree.no  { background: var(--warn-soft); color: var(--warn); }
+
+  /* Threat meter */
+  .meter { margin-top: 20px; position: relative; }
+  .meter-track {
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--safe) 0%, var(--warn) 55%, var(--risk-strong) 100%);
+    position: relative;
+  }
+  .meter-marker {
+    position: absolute;
+    top: 50%;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--bg);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    left: 0;
+    transition: left 0.7s cubic-bezier(0.2,0.7,0.2,1);
+  }
+  .meter-scale {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 9px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .meter-readout {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.84rem;
+    color: var(--ink-2);
+    margin-top: 4px;
+  }
+  .meter-readout b { color: var(--ink); }
+
+  /* Plain-language summary */
+  .summary {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 18px;
+  }
+  .summary-label {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: var(--ink-2);
+    margin-bottom: 11px;
+  }
+  .summary p {
+    color: var(--ink);
+    font-size: 0.92rem;
+    margin-bottom: 9px;
+  }
+  .summary p:last-child { margin-bottom: 0; }
+  .summary b { font-weight: 600; }
+  .summary .lead-safe b { color: var(--safe); }
+  .summary .lead-bad b  { color: var(--risk); }
+  .summary .lead-warn b { color: var(--warn); }
+  .summary code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+    color: var(--brand-2);
+    background: var(--brand-soft);
+    padding: 1px 6px;
+    border-radius: 5px;
+  }
+  .summary .note {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 4px;
+  }
+
+  /* Model cards */
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 680px) { .cards { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-head h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-2);
+  }
+  .pill {
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .pill.safe { background: var(--safe-soft); color: var(--safe); }
+  .pill.bad  { background: var(--risk-soft); color: var(--risk); }
+  .pill.na   { background: var(--line-soft); color: var(--muted); }
+
+  .conf-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .conf-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+  }
+  .conf-num.safe { color: var(--safe); }
+  .conf-num.bad  { color: var(--risk); }
+  .conf-cap { font-size: 0.78rem; color: var(--muted); }
+
+  .bar {
+    height: 7px;
+    border-radius: 999px;
+    background: var(--line-soft);
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .bar > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.7s cubic-bezier(0.2,0.7,0.2,1);
+  }
+  .bar > span.safe { background: var(--safe); }
+  .bar > span.bad  { background: var(--risk); }
+
+  .feat-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .feat-title .q {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    font-size: 9px;
+    display: grid; place-items: center;
+    cursor: help;
+  }
+
+  .feat {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .feat:last-child { border-bottom: none; }
+  .feat-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .feat-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.84rem;
+    color: var(--ink);
+    cursor: help;
+    border-bottom: 1px dotted var(--line);
+  }
+  .feat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .feat-val.pos { background: var(--risk-soft); color: var(--risk); }
+  .feat-val.neg { background: var(--safe-soft); color: var(--safe); }
+  .feat-mag {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line-soft);
+    margin-top: 7px;
+    overflow: hidden;
+  }
+  .feat-mag > span {
+    display: block; height: 100%;
+    border-radius: 999px;
+  }
+  .feat-mag > span.pos { background: var(--risk); }
+  .feat-mag > span.neg { background: var(--safe); }
+  .feat-desc {
+    font-size: 0.78rem;
+    color: var(--ink-2);
+    margin-top: 7px;
+    display: none;
+    line-height: 1.45;
+  }
+  .feat.open .feat-desc { display: block; }
+
+  .na-msg {
+    color: var(--ink-2);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    padding: 6px 0;
+  }
+  .na-msg b { color: var(--ink); }
+
+  /* History */
+  .history { margin-top: 28px; }
+  .history h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .hist-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    border: 1px solid var(--line-soft);
+    border-radius: 11px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .hist-item:hover { border-color: var(--brand); background: var(--panel-2); }
+  .hist-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .hist-dot.safe { background: var(--safe); }
+  .hist-dot.bad  { background: var(--risk); }
+  .hist-url {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--ink-2);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hist-verdict { font-size: 0.76rem; font-weight: 600; }
+  .hist-verdict.safe { color: var(--safe); }
+  .hist-verdict.bad  { color: var(--risk); }
+
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="lens" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a111e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10.5" cy="10.5" r="6.5"></circle>
+          <line x1="15.5" y1="15.5" x2="21" y2="21"></line>
+        </svg>
+      </div>
+      <h1>Phish<span>Lens</span></h1>
+    </div>
+    <p class="tagline">
+      Paste a link to inspect it with two machine-learning models; one reads the <code>URL</code> only,
+      the other fetches the live <code>HTML</code> page and extracts their features. See exactly what influenced them to make each verdict.
+    </p>
+  </header>
+
+  <section class="console">
+    <div class="input-row">
+      <label class="field">
+        <span class="prefix">🔍</span>
+        <input id="urlInput" type="text" placeholder="example.com/login" autocomplete="off" spellcheck="false" aria-label="URL to analyse" />
+      </label>
+      <button id="analyseBtn">Analyse</button>
+    </div>
+    <div class="examples" id="examples">
+      <span class="lbl">Try</span>
+      <!-- chips injected -->
+    </div>
+  </section>
+
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <span>Reading the URL and fetching the live page… this can take a few seconds.</span>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <div id="results"></div>
+
+  <div class="history" id="history" style="display:none;">
+    <h3>This session</h3>
+    <div id="histList"></div>
+  </div>
+
+  <footer>
+    PhishLens — Hybrid URL &amp; HTML phishing detection with explainable AI.
+  </footer>
+
+</div>
+
+<script>
+  // ---- Feature explanations (plain English, supports the explainability angle) ----
+  const FEATURE_INFO = {
+    url_length: "Total characters in the URL. Phishing links are often unusually long to bury the real domain.",
+    domain_length: "Length of the domain name itself.",
+    path_length: "Length of the path after the domain.",
+    num_dots: "Number of dots. Many dots can mean extra subdomains used to look like a trusted site.",
+    num_hyphens: "Number of hyphens, often used to imitate real brand names (e.g. paypal-secure).",
+    num_slashes: "Number of slashes — reflects how deep the path goes.",
+    num_at: "Number of '@' symbols. An '@' can hide the link's true destination.",
+    num_digits: "Count of digits. Lots of numbers can signal auto-generated phishing URLs.",
+    num_params: "Number of query parameters ('?').",
+    num_percent: "Number of '%' characters from URL encoding, which can obscure the real address.",
+    num_subdomains: "Number of subdomains. Extra subdomains are used to impersonate trusted brands.",
+    has_ip: "Whether the link uses a raw IP address instead of a domain name — a common red flag.",
+    has_https: "Whether the link uses HTTPS.",
+    has_at_symbol: "Whether the URL contains an '@' symbol.",
+    has_double_slash: "Whether the path contains '//', sometimes used in sneaky redirects.",
+    has_login: "Whether the URL contains the word 'login'.",
+    has_verify: "Whether the URL contains 'verify' — a classic phishing lure.",
+    has_secure: "Whether the URL contains 'secure'.",
+    has_account: "Whether the URL contains 'account'.",
+    has_update: "Whether the URL contains 'update'.",
+    has_banking: "Whether the URL references banking.",
+    has_confirm: "Whether the URL contains 'confirm'.",
+    has_password: "Whether the URL contains 'password'.",
+    has_signin: "Whether the URL contains 'signin'.",
+    has_ebayisapi: "Whether the URL references 'ebayisapi', seen in eBay-themed scams.",
+    has_webscr: "Whether the URL contains 'webscr', historically used in PayPal scams.",
+    has_cmd: "Whether the URL contains 'cmd'.",
+    has_dispatch: "Whether the URL contains 'dispatch'.",
+    has_paypal: "Whether the URL references PayPal.",
+    num_iframes: "Number of <iframe> tags. Hidden iframes can quietly load malicious content.",
+    num_scripts: "Number of <script> tags on the page.",
+    num_images: "Number of images on the page.",
+    num_links: "Number of links on the page.",
+    num_forms: "Number of forms — phishing pages often have credential-stealing forms.",
+    num_inputs: "Number of input fields on the page.",
+    has_password_field: "Whether the page has a password input field.",
+    num_external_scripts: "Scripts loaded from other domains.",
+    num_external_images: "Images loaded from other domains.",
+    num_hidden_elements: "Hidden elements, sometimes used to conceal content from the viewer.",
+    page_size: "Total size of the page in bytes."
+  };
+
+  const EXAMPLES = [
+    { url: "google.com", safe: true },
+    { url: "en.wikipedia.org/wiki/Phishing", safe: true },
+    { url: "paypal.com/signin/account-verify/login", safe: false },
+    { url: "http://192.168.0.1/secure-update/confirm", safe: false }
+  ];
+
+  const history = [];
+
+  // ---------- Setup ----------
+  const $ = (id) => document.getElementById(id);
+
+  function buildExamples() {
+    const box = $('examples');
+    EXAMPLES.forEach(ex => {
+      const c = document.createElement('button');
+      c.className = 'chip';
+      c.innerHTML = `<span class="dot ${ex.safe ? 'safe' : 'bad'}"></span>${ex.url}`;
+      c.onclick = () => { $('urlInput').value = ex.url; analyse(); };
+      box.appendChild(c);
+    });
+  }
+  buildExamples();
+
+  $('analyseBtn').addEventListener('click', analyse);
+  $('urlInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') analyse(); });
+
+  // ---------- Core ----------
+  async function analyse() {
+    const url = $('urlInput').value.trim();
+    if (!url) return;
+
+    $('results').classList.remove('show');
+    $('notice').className = 'notice';
+    $('notice').textContent = '';
+    $('loader').classList.add('active');
+    $('analyseBtn').disabled = true;
+
+    let data, isDemo = false;
+    try {
+      const res = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      });
+      data = await res.json();
+      if (data.error) throw new Error(data.error);
+    } catch (err) {
+      // Backend not reachable (e.g. opened outside Flask) — fall back to clearly-labelled demo data.
+      data = mockPredict(url);
+      isDemo = true;
+    } finally {
+      $('loader').classList.remove('active');
+      $('analyseBtn').disabled = false;
+    }
+
+    if (isDemo) {
+      const n = $('notice');
+      n.className = 'notice demo';
+      n.textContent = 'Showing demo data — the prediction backend isn’t connected. Run this page inside your Flask app for real results.';
+    }
+    renderResults(data);
+  }
+
+  function conf(pred, malProb) { return ((pred === 1 ? malProb : 1 - malProb) * 100); }
+
+  function renderResults(data) {
+    const u = data.url_only;
+    const h = data.hybrid;
+
+    const uConf = conf(u.prediction, u.probability);
+    const hasHybrid = h && h.html_fetched && h.prediction !== null;
+    const hConf = hasHybrid ? conf(h.prediction, h.probability) : null;
+
+    // ----- combined risk score -----
+    const uRisk = u.probability * 100;
+    const risk = hasHybrid ? (uRisk * 0.5 + h.probability * 100 * 0.5) : uRisk;
+    let band, word;
+    if (risk < 40) { band = 'safe'; word = 'Looks safe'; }
+    else if (risk < 65) { band = 'warn'; word = 'Use caution'; }
+    else { band = 'bad'; word = 'Likely malicious'; }
+
+    const agree = hasHybrid ? (u.prediction === h.prediction) : null;
+    const summary = buildSummary(u, h, hasHybrid, uConf, hConf, band);
+
+    // ----- build markup -----
+    const html = `
+      <div class="verdict-banner ${band} reveal">
+        <div class="verdict-top">
+          <div>
+            <div class="verdict-label">Overall verdict</div>
+            <div class="verdict-word ${band}">${word}</div>
+            <div class="scanned-url">${escapeHtml(data.url)}</div>
+          </div>
+          ${agree === null ? '' :
+            `<span class="agree ${agree ? 'yes' : 'no'}">${agree ? '✓ Models agree' : '⚠ Models disagree'}</span>`}
+        </div>
+        <div class="meter">
+          <div class="meter-track"><div class="meter-marker" id="marker"></div></div>
+          <div class="meter-scale"><span>Safe</span><span>Caution</span><span>Danger</span></div>
+          <div class="meter-readout">Threat score <b>${risk.toFixed(0)}/100</b>${hasHybrid ? ' · blended from both models' : ' · URL model only'}</div>
+        </div>
+      </div>
+
+      ${summary}
+
+      <div class="cards">
+        ${modelCard('URL-only model', u.prediction, uConf, u.top_features)}
+        ${hasHybrid
+          ? modelCard('Hybrid model · URL + HTML', h.prediction, hConf, h.top_features)
+          : hybridUnavailableCard()}
+      </div>
+    `;
+
+    const r = $('results');
+    r.innerHTML = html;
+    r.classList.add('show');
+
+    // animate meter + bars after paint
+    requestAnimationFrame(() => {
+      const m = $('marker');
+      if (m) m.style.left = Math.max(2, Math.min(98, risk)) + '%';
+      document.querySelectorAll('.bar > span').forEach(s => { s.style.width = s.dataset.w + '%'; });
+    });
+
+    wireFeatureToggles();
+    addToHistory(data.url, band, word);
+  }
+
+  function modelCard(title, pred, confidence, features) {
+    const cls = pred === 1 ? 'bad' : 'safe';
+    const label = pred === 1 ? 'Malicious' : 'Benign';
+    return `
+      <div class="card reveal">
+        <div class="card-head">
+          <h2>${title}</h2>
+          <span class="pill ${cls}">${label}</span>
+        </div>
+        <div class="conf-row">
+          <span class="conf-num ${cls}">${confidence.toFixed(1)}%</span>
+          <span class="conf-cap">confidence</span>
+        </div>
+        <div class="bar"><span class="${cls}" data-w="${confidence.toFixed(1)}"></span></div>
+        <div class="feat-title">
+          Top signals
+          <span class="q" title="These are SHAP values: how much each feature pushed the model toward malicious (red, +) or benign (green, −).">?</span>
+        </div>
+        ${(features || []).map(featRow).join('')}
+      </div>
+    `;
+  }
+
+  function featRow([name, val]) {
+    const pos = val > 0;
+    const mag = Math.min(100, Math.abs(val) / 0.5 * 100); // scale for the mini-bar
+    const desc = FEATURE_INFO[name] || 'A feature extracted from the URL or page.';
+    return `
+      <div class="feat">
+        <div class="feat-main">
+          <span class="feat-name" title="Tap for explanation">${name}</span>
+          <span class="feat-val ${pos ? 'pos' : 'neg'}">${pos ? '+' : ''}${val}</span>
+        </div>
+        <div class="feat-mag"><span class="${pos ? 'pos' : 'neg'}" style="width:${mag}%"></span></div>
+        <div class="feat-desc">${desc}</div>
+      </div>
+    `;
+  }
+
+  function hybridUnavailableCard() {
+    return `
+      <div class="card reveal">
+        <div class="card-head">
+          <h2>Hybrid model · URL + HTML</h2>
+          <span class="pill na">No page</span>
+        </div>
+        <p class="na-msg">
+          The live page couldn’t be fetched, so the hybrid model can’t run. This is normal for
+          <b>malicious sites that have been taken down</b> or pages that block automated requests —
+          the URL-only verdict still applies.
+        </p>
+      </div>
+    `;
+  }
+
+  function wireFeatureToggles() {
+    document.querySelectorAll('.feat').forEach(f => {
+      f.addEventListener('click', () => f.classList.toggle('open'));
+    });
+  }
+
+  function addToHistory(url, band, word) {
+    history.unshift({ url, band, word });
+    const list = $('histList');
+    $('history').style.display = 'block';
+    list.innerHTML = history.slice(0, 8).map(it => `
+      <div class="hist-item" data-url="${escapeHtml(it.url)}">
+        <span class="hist-dot ${it.band === 'bad' ? 'bad' : 'safe'}"></span>
+        <span class="hist-url">${escapeHtml(it.url)}</span>
+        <span class="hist-verdict ${it.band === 'bad' ? 'bad' : 'safe'}">${it.word}</span>
+      </div>
+    `).join('');
+    list.querySelectorAll('.hist-item').forEach(el => {
+      el.onclick = () => { $('urlInput').value = el.dataset.url; analyse(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  // ---------- Plain-language summary (built from the models' own SHAP output) ----------
+  const LABEL = {
+    url_length: 'the URL length', domain_length: 'the domain length', path_length: 'the path length',
+    num_dots: 'the number of dots', num_hyphens: 'the number of hyphens', num_slashes: 'the number of slashes',
+    num_at: "the use of '@'", num_digits: 'the number of digits', num_params: 'the query parameters',
+    num_percent: 'the encoded characters', num_subdomains: 'the number of subdomains',
+    has_ip: 'the use of a raw IP address', has_https: 'the HTTPS status', has_at_symbol: "the '@' symbol",
+    has_double_slash: "a '//' in the path", has_login: "the word 'login'", has_verify: "the word 'verify'",
+    has_secure: "the word 'secure'", has_account: "the word 'account'", has_update: "the word 'update'",
+    has_banking: 'a banking reference', has_confirm: "the word 'confirm'", has_password: "the word 'password'",
+    has_signin: "the word 'signin'", has_ebayisapi: "an 'ebayisapi' reference", has_webscr: "a 'webscr' reference",
+    has_cmd: "the word 'cmd'", has_dispatch: "the word 'dispatch'", has_paypal: 'a PayPal reference',
+    num_iframes: 'the number of iframes', num_scripts: 'the number of scripts', num_images: 'the number of images',
+    num_links: 'the number of links', num_forms: 'the number of forms', num_inputs: 'the number of input fields',
+    has_password_field: 'a password field', num_external_scripts: 'externally-loaded scripts',
+    num_external_images: 'externally-loaded images', num_hidden_elements: 'hidden elements', page_size: 'the page size'
+  };
+  function lbl(name) { return LABEL[name] || name.replace(/_/g, ' '); }
+  function joinList(arr) {
+    if (arr.length <= 1) return arr[0] || '';
+    if (arr.length === 2) return arr[0] + ' and ' + arr[1];
+    return arr.slice(0, -1).join(', ') + ', and ' + arr[arr.length - 1];
+  }
+  function modelSentence(modelName, pred, malProb, features) {
+    const verdict = pred === 1 ? 'malicious' : 'benign';
+    const contribs = (features || []).slice(0, 3).map(([n, v]) =>
+      `<code>${n}</code> (${v > 0 ? '+' : ''}${v})`);
+    let s = `The <b>${modelName}</b> returned a <b>${verdict}</b> label, P(malicious) = ${malProb.toFixed(3)}.`;
+    if (contribs.length) s += ` Top SHAP contributions: ${joinList(contribs)}.`;
+    return s;
+  }
+  function buildSummary(u, h, hasHybrid, uConf, hConf, band) {
+    const leadClass = band === 'bad' ? 'lead-bad' : (band === 'warn' ? 'lead-warn' : 'lead-safe');
+    let lead;
+    if (hasHybrid && u.prediction === h.prediction) {
+      lead = `Both classifiers converge on a <b>${u.prediction ? 'malicious' : 'benign'}</b> classification.`;
+    } else if (hasHybrid) {
+      lead = `The classifiers <b>diverge</b> — URL-only: ${u.prediction ? 'malicious' : 'benign'}, `
+           + `hybrid: ${h.prediction ? 'malicious' : 'benign'} — indicating the lexical and content-based signals conflict.`;
+    } else {
+      lead = `HTML retrieval failed; only the URL-only classifier produced an output: `
+           + `<b>${u.prediction ? 'malicious' : 'benign'}</b>.`;
+    }
+    const parts = [`<p class="${leadClass}">${lead}</p>`,
+      `<p>${modelSentence('URL-only classifier', u.prediction, u.probability, u.top_features)}</p>`];
+    if (hasHybrid) parts.push(`<p>${modelSentence('hybrid classifier', h.prediction, h.probability, h.top_features)}</p>`);
+    parts.push(`<p class="note">Positive SHAP values increase malicious likelihood; negative values decrease it.</p>`);
+    return `<div class="summary reveal"><div class="summary-label">What this means</div>${parts.join('')}</div>`;
+  }
+
+  // ---------- Demo fallback (only used when the Flask backend isn't reachable) ----------
+  function mockPredict(url) {
+    const low = url.toLowerCase();
+    const kw = ['login','verify','secure','account','update','confirm','signin','webscr','paypal','bank'];
+    let score = 0.15;
+    kw.forEach(k => { if (low.includes(k)) score += 0.13; });
+    if (/\d+\.\d+\.\d+\.\d+/.test(low)) score += 0.3;
+    if (low.replace(/^https?:\/\//,'').length > 40) score += 0.15;
+    if ((low.match(/-/g) || []).length > 2) score += 0.1;
+    score = Math.max(0.03, Math.min(0.97, score));
+    const pred = score > 0.5 ? 1 : 0;
+    const feats = [
+      ['num_slashes', +(score*0.3).toFixed(4)],
+      ['has_login', low.includes('login') ? 0.18 : -0.04],
+      ['url_length', +((score-0.3)*0.2).toFixed(4)],
+      ['num_subdomains', -0.06],
+      ['has_https', low.startsWith('https') ? -0.05 : 0.03]
+    ];
+    return {
+      url,
+      url_only: { prediction: pred, probability: +score.toFixed(4), top_features: feats },
+      hybrid: { prediction: pred, probability: +Math.min(0.95, score+0.05).toFixed(4),
+                top_features: [['num_links', 0.06],['num_scripts',0.03],['page_size',-0.02],['num_forms', pred?0.05:-0.03],['num_hidden_elements',-0.02]],
+                html_fetched: true }
+    };
+  }
+</script>
+</body>
+</html>
