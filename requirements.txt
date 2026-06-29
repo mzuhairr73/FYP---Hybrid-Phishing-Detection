@@ -1,4 +1,4 @@
-ÿþanyio==4.13.0
+anyio==4.13.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
 arrow==1.4.0
@@ -77,6 +77,7 @@ pandas==3.0.2
 pandocfilters==1.5.1
 parso==0.8.6
 pillow==12.2.0
+pip==26.0.1
 platformdirs==4.9.6
 prometheus_client==0.25.0
 prompt_toolkit==3.0.52
@@ -98,6 +99,7 @@ rfc3987-syntax==1.1.0
 rpds-py==0.30.0
 scikit-learn==1.8.0
 scipy==1.17.1
+seaborn==0.13.2
 Send2Trash==2.1.0
 setuptools==82.0.1
 shap==0.51.0
@@ -120,4 +122,4 @@ webcolors==25.10.0
 webencodings==0.5.1
 websocket-client==1.9.0
 Werkzeug==3.1.8
-widgetsnbextension==4.0.15
+widgetsnbextension==4.0.15
